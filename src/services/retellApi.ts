@@ -1,16 +1,16 @@
 
 import { Retell } from 'retell-sdk';
 import type {
-  Agent as SDKAgent,
-  Voice as SDKVoice,
-  Llm as SDKLLM,
-  Call as SDKCall,
-  PhoneNumber as SDKPhoneNumber,
-  AgentListResponseData,
-  VoiceListResponseData,
-  LlmListResponseData,
-  CallListResponseData,
-  PhoneNumberListResponseData
+  AgentListResponse,
+  AgentResponse,
+  VoiceListResponse, 
+  LlmListResponse, 
+  CallListResponse, 
+  PhoneNumberListResponse,
+  WebCallResponse,
+  AgentCreateParams,
+  CallCreateWebCallParams,
+  CallCreatePhoneCallParams
 } from 'retell-sdk';
 import { RETELL_API_KEY, RETELL_API_BASE_URL } from '../config/retell';
 
@@ -90,7 +90,7 @@ class RetellAPI {
       const response = await this.client.agent.list();
       
       // Convert SDK response to expected format
-      const agents: RetellAgent[] = (response.data || []).map((agent: SDKAgent) => ({
+      const agents: RetellAgent[] = (response.agents || []).map((agent: any) => ({
         id: agent.id || "",
         voice_id: agent.voice_id || "",
         llm_id: agent.llm_id || "",
@@ -128,7 +128,7 @@ class RetellAPI {
   async createAgent(data: CreateAgentRequest) {
     try {
       // Prepare the request to match the SDK's expected format
-      const requestData = {
+      const requestData: AgentCreateParams = {
         name: data.name,
         voice_id: data.voice_id,
         llm_id: data.llm_id,
@@ -136,7 +136,7 @@ class RetellAPI {
         metadata: data.metadata,
         custom_data: data.custom_data,
         response_engine: {
-          type: "retell_llm"
+          type: "retell_llm" as const
         }
       };
       
@@ -164,7 +164,7 @@ class RetellAPI {
       const response = await this.client.voice.list();
       
       // Convert SDK response to expected format
-      const voices: RetellVoice[] = (response.data || []).map((voice: SDKVoice) => ({
+      const voices: RetellVoice[] = (response.voices || []).map((voice: any) => ({
         id: voice.id || "",
         name: voice.name || "",
         created_at: voice.created_at || ""
@@ -193,7 +193,7 @@ class RetellAPI {
       const response = await this.client.llm.list();
       
       // Convert SDK response to expected format
-      const llms: RetellLLM[] = (response.data || []).map((llm: SDKLLM) => ({
+      const llms: RetellLLM[] = (response.llms || []).map((llm: any) => ({
         id: llm.id || "",
         type: llm.type || "",
         name: llm.name || "",
@@ -220,7 +220,7 @@ class RetellAPI {
   // Web Calls
   async createWebCall(data: CreateCallRequest) {
     try {
-      const callParams = {
+      const callParams: CallCreateWebCallParams = {
         agent_id: data.agent_id,
         metadata: data.metadata
       };
@@ -242,10 +242,10 @@ class RetellAPI {
   async createPhoneCall(data: { agent_id: string; to_phone: string; metadata?: Record<string, string> }) {
     try {
       const response = await this.client.call.createPhoneCall({
-        to_phone: data.to_phone,
+        to: data.to_phone,
         metadata: data.metadata,
         agent_id: data.agent_id
-      });
+      } as CallCreatePhoneCallParams);
       return response;
     } catch (error) {
       console.error("Error creating phone call:", error);
@@ -259,7 +259,7 @@ class RetellAPI {
       const response = await this.client.call.list({});
       
       // Convert SDK response to expected format
-      const calls: RetellCall[] = (response.data || []).map((call: SDKCall) => ({
+      const calls: RetellCall[] = (response.calls || []).map((call: any) => ({
         id: call.id || "",
         agent_id: call.agent_id || "",
         status: call.status || "",
@@ -301,7 +301,7 @@ class RetellAPI {
       const response = await this.client.phoneNumber.list();
       
       // Convert SDK response to expected format
-      const phoneNumbers: PhoneNumber[] = (response.data || []).map((phone: SDKPhoneNumber) => ({
+      const phoneNumbers: PhoneNumber[] = (response.phone_numbers || []).map((phone: any) => ({
         id: phone.id || "",
         phone_number: phone.phone_number || "",
         created_at: phone.created_at || ""

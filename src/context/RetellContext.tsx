@@ -109,7 +109,6 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createAgent = async (data: CreateAgentRequest) => {
     setIsLoading(true);
     try {
-      // Make sure response_engine is set
       const agentData: CreateAgentRequest = {
         ...data,
         response_engine: { type: "retell_llm" }
