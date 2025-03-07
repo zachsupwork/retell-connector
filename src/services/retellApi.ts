@@ -1,4 +1,6 @@
 
+import { Retell } from '@retell/sdk';
+
 interface RetellConfig {
   apiKey: string;
   baseUrl?: string;
@@ -56,119 +58,171 @@ export interface CreateAgentRequest {
 }
 
 class RetellAPI {
+  private client: Retell;
   private apiKey: string;
-  private baseUrl: string;
 
   constructor(config: RetellConfig) {
     this.apiKey = config.apiKey;
-    // Fixed API endpoint - removed the /v2 suffix as that seems to be causing the 404s
-    this.baseUrl = config.baseUrl || 'https://api.retellai.com';
-  }
-
-  private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
-    const headers = {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.apiKey}`,
-      ...options.headers
-    };
-
-    try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
-        ...options,
-        headers
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        let errorData;
-        try {
-          errorData = JSON.parse(errorText);
-        } catch (e) {
-          errorData = { message: errorText };
-        }
-        
-        throw new Error(`Retell API Error: ${response.status} ${JSON.stringify(errorData)}`);
-      }
-
-      return response.json();
-    } catch (error) {
-      console.error(`Error fetching ${endpoint}:`, error);
-      throw error;
-    }
+    // Initialize the Retell SDK client
+    this.client = new Retell({
+      apiKey: this.apiKey,
+      // If baseUrl is provided, use it, otherwise let the SDK use its default
+      ...(config.baseUrl && { baseURL: config.baseUrl }),
+    });
   }
 
   // Agents
   async listAgents() {
-    return this.fetchWithAuth('/agents') as Promise<{ data: RetellAgent[] }>;
+    try {
+      const response = await this.client.agent.list();
+      return { data: response.data };
+    } catch (error) {
+      console.error("Error listing agents:", error);
+      throw this.formatError(error);
+    }
   }
 
   async getAgent(agentId: string) {
-    return this.fetchWithAuth(`/agents/${agentId}`) as Promise<RetellAgent>;
+    try {
+      const response = await this.client.agent.retrieve(agentId);
+      return response;
+    } catch (error) {
+      console.error(`Error retrieving agent ${agentId}:`, error);
+      throw this.formatError(error);
+    }
   }
 
   async createAgent(data: CreateAgentRequest) {
-    return this.fetchWithAuth('/agents', {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }) as Promise<RetellAgent>;
+    try {
+      const response = await this.client.agent.create(data);
+      return response;
+    } catch (error) {
+      console.error("Error creating agent:", error);
+      throw this.formatError(error);
+    }
   }
 
   // Voices
   async listVoices() {
-    return this.fetchWithAuth('/voices') as Promise<{ data: RetellVoice[] }>;
+    try {
+      const response = await this.client.voice.list();
+      return { data: response.data };
+    } catch (error) {
+      console.error("Error listing voices:", error);
+      throw this.formatError(error);
+    }
   }
 
   async getVoice(voiceId: string) {
-    return this.fetchWithAuth(`/voices/${voiceId}`) as Promise<RetellVoice>;
+    try {
+      const response = await this.client.voice.retrieve(voiceId);
+      return response;
+    } catch (error) {
+      console.error(`Error retrieving voice ${voiceId}:`, error);
+      throw this.formatError(error);
+    }
   }
 
   // LLMs
   async listLLMs() {
-    return this.fetchWithAuth('/llms') as Promise<{ data: RetellLLM[] }>;
+    try {
+      const response = await this.client.llm.list();
+      return { data: response.data };
+    } catch (error) {
+      console.error("Error listing LLMs:", error);
+      throw this.formatError(error);
+    }
   }
 
   async getLLM(llmId: string) {
-    return this.fetchWithAuth(`/llms/${llmId}`) as Promise<RetellLLM>;
+    try {
+      const response = await this.client.llm.retrieve(llmId);
+      return response;
+    } catch (error) {
+      console.error(`Error retrieving LLM ${llmId}:`, error);
+      throw this.formatError(error);
+    }
   }
 
   // Web Calls
   async createWebCall(data: CreateCallRequest) {
-    return this.fetchWithAuth('/calls', {
-      method: 'POST',
-      body: JSON.stringify({
+    try {
+      const response = await this.client.call.create({
         ...data,
         type: 'web'
-      })
-    }) as Promise<{ id: string, register_url: string }>;
+      });
+      return response;
+    } catch (error) {
+      console.error("Error creating web call:", error);
+      throw this.formatError(error);
+    }
   }
 
   // Phone Calls
   async createPhoneCall(data: CreateCallRequest & { to_phone: string }) {
-    return this.fetchWithAuth('/calls', {
-      method: 'POST',
-      body: JSON.stringify({
+    try {
+      const response = await this.client.call.create({
         ...data,
         type: 'phone'
-      })
-    }) as Promise<{ id: string }>;
+      });
+      return response;
+    } catch (error) {
+      console.error("Error creating phone call:", error);
+      throw this.formatError(error);
+    }
   }
 
   // Calls
   async listCalls() {
-    return this.fetchWithAuth('/calls') as Promise<{ data: RetellCall[] }>;
+    try {
+      const response = await this.client.call.list();
+      return { data: response.data };
+    } catch (error) {
+      console.error("Error listing calls:", error);
+      throw this.formatError(error);
+    }
   }
 
   async getCall(callId: string) {
-    return this.fetchWithAuth(`/calls/${callId}`) as Promise<RetellCall>;
+    try {
+      const response = await this.client.call.retrieve(callId);
+      return response;
+    } catch (error) {
+      console.error(`Error retrieving call ${callId}:`, error);
+      throw this.formatError(error);
+    }
   }
 
   // Phone Numbers
   async listPhoneNumbers() {
-    return this.fetchWithAuth('/phone-numbers') as Promise<{ data: PhoneNumber[] }>;
+    try {
+      const response = await this.client.phoneNumber.list();
+      return { data: response.data };
+    } catch (error) {
+      console.error("Error listing phone numbers:", error);
+      throw this.formatError(error);
+    }
   }
 
   async getPhoneNumber(phoneNumberId: string) {
-    return this.fetchWithAuth(`/phone-numbers/${phoneNumberId}`) as Promise<PhoneNumber>;
+    try {
+      const response = await this.client.phoneNumber.retrieve(phoneNumberId);
+      return response;
+    } catch (error) {
+      console.error(`Error retrieving phone number ${phoneNumberId}:`, error);
+      throw this.formatError(error);
+    }
+  }
+
+  // Helper method to format errors in a consistent way
+  private formatError(error: any): Error {
+    if (error.response?.data) {
+      return new Error(`Retell API Error: ${error.response.status} ${JSON.stringify(error.response.data)}`);
+    } else if (error.message) {
+      return new Error(`Retell API Error: ${error.message}`);
+    } else {
+      return new Error(`Retell API Error: Unknown error occurred`);
+    }
   }
 }
 
