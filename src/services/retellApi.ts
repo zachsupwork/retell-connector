@@ -1,16 +1,12 @@
 
 import { Retell } from 'retell-sdk';
 import type {
-  AgentListResponse,
-  AgentResponse,
-  VoiceListResponse, 
-  LlmListResponse, 
-  CallListResponse, 
-  PhoneNumberListResponse,
-  WebCallResponse,
-  AgentCreateParams,
-  CallCreateWebCallParams,
-  CallCreatePhoneCallParams
+  Agent,
+  Voice,
+  Llm,
+  Call,
+  PhoneNumber,
+  ResponseEngineType
 } from 'retell-sdk';
 import { RETELL_API_KEY, RETELL_API_BASE_URL } from '../config/retell';
 
@@ -90,7 +86,7 @@ class RetellAPI {
       const response = await this.client.agent.list();
       
       // Convert SDK response to expected format
-      const agents: RetellAgent[] = (response.agents || []).map((agent: any) => ({
+      const agents: RetellAgent[] = (response.data || []).map((agent: Agent) => ({
         id: agent.id || "",
         voice_id: agent.voice_id || "",
         llm_id: agent.llm_id || "",
@@ -128,7 +124,7 @@ class RetellAPI {
   async createAgent(data: CreateAgentRequest) {
     try {
       // Prepare the request to match the SDK's expected format
-      const requestData: AgentCreateParams = {
+      const requestData = {
         name: data.name,
         voice_id: data.voice_id,
         llm_id: data.llm_id,
@@ -136,7 +132,7 @@ class RetellAPI {
         metadata: data.metadata,
         custom_data: data.custom_data,
         response_engine: {
-          type: "retell_llm" as const
+          type: "retell_llm" as ResponseEngineType
         }
       };
       
@@ -164,7 +160,7 @@ class RetellAPI {
       const response = await this.client.voice.list();
       
       // Convert SDK response to expected format
-      const voices: RetellVoice[] = (response.voices || []).map((voice: any) => ({
+      const voices: RetellVoice[] = (response.data || []).map((voice: Voice) => ({
         id: voice.id || "",
         name: voice.name || "",
         created_at: voice.created_at || ""
@@ -193,7 +189,7 @@ class RetellAPI {
       const response = await this.client.llm.list();
       
       // Convert SDK response to expected format
-      const llms: RetellLLM[] = (response.llms || []).map((llm: any) => ({
+      const llms: RetellLLM[] = (response.data || []).map((llm: Llm) => ({
         id: llm.id || "",
         type: llm.type || "",
         name: llm.name || "",
@@ -220,7 +216,7 @@ class RetellAPI {
   // Web Calls
   async createWebCall(data: CreateCallRequest) {
     try {
-      const callParams: CallCreateWebCallParams = {
+      const callParams = {
         agent_id: data.agent_id,
         metadata: data.metadata
       };
@@ -245,7 +241,7 @@ class RetellAPI {
         to: data.to_phone,
         metadata: data.metadata,
         agent_id: data.agent_id
-      } as CallCreatePhoneCallParams);
+      });
       return response;
     } catch (error) {
       console.error("Error creating phone call:", error);
@@ -259,7 +255,7 @@ class RetellAPI {
       const response = await this.client.call.list({});
       
       // Convert SDK response to expected format
-      const calls: RetellCall[] = (response.calls || []).map((call: any) => ({
+      const calls: RetellCall[] = (response.data || []).map((call: Call) => ({
         id: call.id || "",
         agent_id: call.agent_id || "",
         status: call.status || "",
@@ -301,7 +297,7 @@ class RetellAPI {
       const response = await this.client.phoneNumber.list();
       
       // Convert SDK response to expected format
-      const phoneNumbers: PhoneNumber[] = (response.phone_numbers || []).map((phone: any) => ({
+      const phoneNumbers: PhoneNumber[] = (response.data || []).map((phone: PhoneNumber) => ({
         id: phone.id || "",
         phone_number: phone.phone_number || "",
         created_at: phone.created_at || ""
