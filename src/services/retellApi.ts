@@ -61,7 +61,7 @@ class RetellAPI {
 
   constructor(config: RetellConfig) {
     this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl || 'https://api.retell.io/v1';
+    this.baseUrl = config.baseUrl || 'https://api.retellai.com/v2';
   }
 
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
@@ -86,15 +86,15 @@ class RetellAPI {
 
   // Agents
   async listAgents() {
-    return this.fetchWithAuth('/agents') as Promise<{ data: RetellAgent[] }>;
+    return this.fetchWithAuth('/list-agents') as Promise<{ data: RetellAgent[] }>;
   }
 
   async getAgent(agentId: string) {
-    return this.fetchWithAuth(`/agents/${agentId}`) as Promise<RetellAgent>;
+    return this.fetchWithAuth(`/get-agent/${agentId}`) as Promise<RetellAgent>;
   }
 
   async createAgent(data: CreateAgentRequest) {
-    return this.fetchWithAuth('/agents', {
+    return this.fetchWithAuth('/create-agent', {
       method: 'POST',
       body: JSON.stringify(data)
     }) as Promise<RetellAgent>;
@@ -102,25 +102,25 @@ class RetellAPI {
 
   // Voices
   async listVoices() {
-    return this.fetchWithAuth('/voices') as Promise<{ data: RetellVoice[] }>;
+    return this.fetchWithAuth('/list-voices') as Promise<{ data: RetellVoice[] }>;
   }
 
   async getVoice(voiceId: string) {
-    return this.fetchWithAuth(`/voices/${voiceId}`) as Promise<RetellVoice>;
+    return this.fetchWithAuth(`/get-voice/${voiceId}`) as Promise<RetellVoice>;
   }
 
   // LLMs
   async listLLMs() {
-    return this.fetchWithAuth('/llms') as Promise<{ data: RetellLLM[] }>;
+    return this.fetchWithAuth('/list-retell-llms') as Promise<{ data: RetellLLM[] }>;
   }
 
   async getLLM(llmId: string) {
-    return this.fetchWithAuth(`/llms/${llmId}`) as Promise<RetellLLM>;
+    return this.fetchWithAuth(`/get-retell-llm/${llmId}`) as Promise<RetellLLM>;
   }
 
   // Web Calls
   async createWebCall(data: CreateCallRequest) {
-    return this.fetchWithAuth('/calls', {
+    return this.fetchWithAuth('/create-web-call', {
       method: 'POST',
       body: JSON.stringify({
         ...data,
@@ -131,7 +131,7 @@ class RetellAPI {
 
   // Phone Calls
   async createPhoneCall(data: CreateCallRequest & { to_phone: string }) {
-    return this.fetchWithAuth('/calls', {
+    return this.fetchWithAuth('/create-phone-call', {
       method: 'POST',
       body: JSON.stringify({
         ...data,
@@ -142,20 +142,20 @@ class RetellAPI {
 
   // Calls
   async listCalls() {
-    return this.fetchWithAuth('/calls') as Promise<{ data: RetellCall[] }>;
+    return this.fetchWithAuth('/list-calls') as Promise<{ data: RetellCall[] }>;
   }
 
   async getCall(callId: string) {
-    return this.fetchWithAuth(`/calls/${callId}`) as Promise<RetellCall>;
+    return this.fetchWithAuth(`/get-call/${callId}`) as Promise<RetellCall>;
   }
 
   // Phone Numbers
   async listPhoneNumbers() {
-    return this.fetchWithAuth('/phone-numbers') as Promise<{ data: PhoneNumber[] }>;
+    return this.fetchWithAuth('/list-phone-numbers') as Promise<{ data: PhoneNumber[] }>;
   }
 
   async getPhoneNumber(phoneNumberId: string) {
-    return this.fetchWithAuth(`/phone-numbers/${phoneNumberId}`) as Promise<PhoneNumber>;
+    return this.fetchWithAuth(`/get-phone-number/${phoneNumberId}`) as Promise<PhoneNumber>;
   }
 }
 
