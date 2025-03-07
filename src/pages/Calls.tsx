@@ -8,11 +8,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { RefreshCcw, Plus, Phone, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 
 const Calls = () => {
   const { calls, agents, isLoading, refreshCalls, error } = useRetell();
   const [refreshing, setRefreshing] = useState(false);
+  const [lastRefreshAttempt, setLastRefreshAttempt] = useState(0);
   const { toast } = useToast();
+
+  const isRateLimitError = error?.includes("429") || error?.includes("Too many requests");
 
   const getAgentName = (agentId: string) => {
     const agent = agents.find(a => a.id === agentId);
@@ -42,13 +46,28 @@ const Calls = () => {
   const handleRefresh = async () => {
     if (refreshing) return;
     
+    // Rate limiting protection - don't allow refreshing more than once every 5 seconds
+    const now = Date.now();
+    if (now - lastRefreshAttempt < 5000) {
+      toast({
+        title: "Please wait",
+        description: "To avoid rate limiting, please wait a moment before refreshing again",
+        variant: "default"
+      });
+      return;
+    }
+    
     setRefreshing(true);
+    setLastRefreshAttempt(now);
+    
     try {
       await refreshCalls();
-      toast({
-        title: "Success",
-        description: "Call list refreshed successfully",
-      });
+      if (!isRateLimitError) {
+        toast({
+          title: "Success",
+          description: "Call list refreshed successfully",
+        });
+      }
     } catch (err) {
       console.error("Error refreshing calls:", err);
     } finally {
@@ -56,14 +75,18 @@ const Calls = () => {
     }
   };
 
-  // Initial fetch
+  // Initial fetch with rate limiting protection
   useEffect(() => {
     if (calls.length === 0 && !isLoading && !error) {
-      refreshCalls().catch(err => {
-        console.error("Error in initial call fetch:", err);
-      });
+      const now = Date.now();
+      if (now - lastRefreshAttempt > 5000) {
+        setLastRefreshAttempt(now);
+        refreshCalls().catch(err => {
+          console.error("Error in initial call fetch:", err);
+        });
+      }
     }
-  }, [calls.length, isLoading, error, refreshCalls]);
+  }, [calls.length, isLoading, error, refreshCalls, lastRefreshAttempt]);
 
   return (
     <div className="space-y-6">
@@ -88,6 +111,16 @@ const Calls = () => {
         </div>
       </div>
 
+      {isRateLimitError && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Rate Limit Exceeded</AlertTitle>
+          <AlertDescription>
+            Retell API Error: 429 Too many requests, please try again later.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Recent Calls</CardTitle>
@@ -96,7 +129,7 @@ const Calls = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {error && (
+          {error && !isRateLimitError && (
             <div className="mb-4 p-4 border border-red-200 bg-red-50 rounded-md flex items-center">
               <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
               <p className="text-sm text-red-700">{error}</p>
@@ -113,7 +146,9 @@ const Calls = () => {
               <Phone className="h-8 w-8 mx-auto text-muted-foreground" />
               <h3 className="mt-4 text-lg font-medium">No calls found</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Start your first call to see your call history here.
+                {isRateLimitError 
+                  ? "Unable to load calls due to rate limiting. Please try again later."
+                  : "Start your first call to see your call history here."}
               </p>
               <Button asChild className="mt-4">
                 <Link to="/calls/new">Start a New Call</Link>

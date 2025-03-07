@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { createRetellAPI, RetellAgent, RetellVoice, RetellLLM, RetellCall } from "../services/retellApi";
+import { createRetellAPI, RetellAgent, RetellVoice, RetellLLM, RetellCall, CreateAgentRequest } from "../services/retellApi";
 import { RETELL_API_KEY } from "../config/retell";
 import { useToast } from "@/components/ui/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -16,7 +15,7 @@ interface RetellContextType {
   refreshVoices: () => Promise<void>;
   refreshLLMs: () => Promise<void>;
   refreshCalls: () => Promise<void>;
-  createAgent: (data: any) => Promise<RetellAgent>;
+  createAgent: (data: CreateAgentRequest) => Promise<RetellAgent>;
   createWebCall: (agentId: string) => Promise<{ id: string, register_url: string }>;
   getCall: (callId: string) => Promise<RetellCall>;
 }
@@ -39,7 +38,6 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const message = err.message || `Failed to ${operation}`;
     setError(message);
     
-    // Show error both in toast and sonner for better visibility
     toast({
       title: "API Error",
       description: message,
@@ -57,7 +55,6 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setError(null);
     } catch (err: any) {
       handleApiError(err, "fetch agents");
-      // Set empty array to prevent undefined errors in UI
       setAgents([]);
     } finally {
       setIsLoading(false);
@@ -72,7 +69,6 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setError(null);
     } catch (err: any) {
       handleApiError(err, "fetch voices");
-      // Set empty array to prevent undefined errors in UI
       setVoices([]);
     } finally {
       setIsLoading(false);
@@ -87,7 +83,6 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setError(null);
     } catch (err: any) {
       handleApiError(err, "fetch LLMs");
-      // Set empty array to prevent undefined errors in UI
       setLLMs([]);
     } finally {
       setIsLoading(false);
@@ -102,14 +97,13 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setError(null);
     } catch (err: any) {
       handleApiError(err, "fetch calls");
-      // Set empty array to prevent undefined errors in UI
       setCalls([]);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const createAgent = async (data: any) => {
+  const createAgent = async (data: CreateAgentRequest) => {
     setIsLoading(true);
     try {
       const agent = await retellApi.createAgent(data);
@@ -149,7 +143,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsLoading(true);
     try {
       const call = await retellApi.getCall(callId);
-      return call;
+      return call as RetellCall;
     } catch (err: any) {
       handleApiError(err, "get call");
       throw err;
@@ -159,12 +153,9 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   };
 
   useEffect(() => {
-    // Initial data fetching
     const fetchInitialData = async () => {
       setIsLoading(true);
       
-      // Try to fetch each data type independently so that errors in one
-      // don't prevent the others from loading
       const fetchPromises = [
         (async () => {
           try {
@@ -211,7 +202,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     fetchInitialData();
   }, []);
 
-  const value = {
+  const value: RetellContextType = {
     agents,
     voices,
     llms,

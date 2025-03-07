@@ -1,5 +1,12 @@
 
 import { Retell } from 'retell-sdk';
+import type {
+  AgentResponse, 
+  VoiceResponse, 
+  LlmResponse, 
+  CallResponse, 
+  PhoneNumberResponse
+} from 'retell-sdk';
 
 interface RetellConfig {
   apiKey: string;
@@ -55,6 +62,7 @@ export interface CreateAgentRequest {
   llm_webhook_url?: string;
   metadata?: Record<string, string>;
   custom_data?: Record<string, any>;
+  response_engine: string;
 }
 
 class RetellAPI {
@@ -75,7 +83,10 @@ class RetellAPI {
   async listAgents() {
     try {
       const response = await this.client.agent.list();
-      return { data: response.data };
+      // Convert SDK response to expected format
+      return { 
+        data: response.agents || [] 
+      };
     } catch (error) {
       console.error("Error listing agents:", error);
       throw this.formatError(error);
@@ -85,7 +96,15 @@ class RetellAPI {
   async getAgent(agentId: string) {
     try {
       const response = await this.client.agent.retrieve(agentId);
-      return response;
+      // Convert the SDK response to our expected format
+      const agent: RetellAgent = {
+        id: response.id,
+        voice_id: response.voice_id,
+        llm_id: response.llm_id,
+        name: response.name || "",
+        created_at: response.created_at,
+      };
+      return agent;
     } catch (error) {
       console.error(`Error retrieving agent ${agentId}:`, error);
       throw this.formatError(error);
@@ -94,8 +113,24 @@ class RetellAPI {
 
   async createAgent(data: CreateAgentRequest) {
     try {
-      const response = await this.client.agent.create(data);
-      return response;
+      // Set a default response_engine if not provided
+      const agentData = {
+        ...data,
+        response_engine: data.response_engine || "generate",
+      };
+      
+      const response = await this.client.agent.create(agentData);
+      
+      // Convert the SDK response to our expected format
+      const agent: RetellAgent = {
+        id: response.id,
+        voice_id: response.voice_id,
+        llm_id: response.llm_id,
+        name: response.name || "",
+        created_at: response.created_at,
+      };
+      
+      return agent;
     } catch (error) {
       console.error("Error creating agent:", error);
       throw this.formatError(error);
@@ -106,7 +141,10 @@ class RetellAPI {
   async listVoices() {
     try {
       const response = await this.client.voice.list();
-      return { data: response.data };
+      // Convert SDK response to expected format
+      return { 
+        data: response.voices || [] 
+      };
     } catch (error) {
       console.error("Error listing voices:", error);
       throw this.formatError(error);
@@ -127,7 +165,10 @@ class RetellAPI {
   async listLLMs() {
     try {
       const response = await this.client.llm.list();
-      return { data: response.data };
+      // Convert SDK response to expected format
+      return { 
+        data: response.llms || [] 
+      };
     } catch (error) {
       console.error("Error listing LLMs:", error);
       throw this.formatError(error);
@@ -147,9 +188,9 @@ class RetellAPI {
   // Web Calls
   async createWebCall(data: CreateCallRequest) {
     try {
-      const response = await this.client.call.create({
-        ...data,
-        type: 'web'
+      const response = await this.client.call.createWebCall({
+        agent_id: data.agent_id,
+        metadata: data.metadata
       });
       return response;
     } catch (error) {
@@ -161,9 +202,10 @@ class RetellAPI {
   // Phone Calls
   async createPhoneCall(data: CreateCallRequest & { to_phone: string }) {
     try {
-      const response = await this.client.call.create({
-        ...data,
-        type: 'phone'
+      const response = await this.client.call.createPhoneCall({
+        agent_id: data.agent_id,
+        to_phone: data.to_phone,
+        metadata: data.metadata
       });
       return response;
     } catch (error) {
@@ -175,8 +217,11 @@ class RetellAPI {
   // Calls
   async listCalls() {
     try {
-      const response = await this.client.call.list();
-      return { data: response.data };
+      const response = await this.client.call.list({});
+      // Convert SDK response to expected format
+      return { 
+        data: response.calls || [] 
+      };
     } catch (error) {
       console.error("Error listing calls:", error);
       throw this.formatError(error);
@@ -197,7 +242,10 @@ class RetellAPI {
   async listPhoneNumbers() {
     try {
       const response = await this.client.phoneNumber.list();
-      return { data: response.data };
+      // Convert SDK response to expected format
+      return { 
+        data: response.phone_numbers || [] 
+      };
     } catch (error) {
       console.error("Error listing phone numbers:", error);
       throw this.formatError(error);
