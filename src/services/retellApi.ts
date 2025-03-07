@@ -1,5 +1,5 @@
 
-import { Retell, CallResponse, WebCallResponse, PhoneCallResponse, ResponseEngineRetellLm, ResponseEngineCustomLm, ResponseEngineConversationFlow, CallCreatePhoneCallParams } from 'retell-sdk';
+import { Retell } from 'retell-sdk';
 import { 
   RETELL_API_KEY, 
   RETELL_API_BASE_URL, 
@@ -19,6 +19,31 @@ interface RetellConfig {
   proxyUrl?: string;
 }
 
+// Define our own interface for response engine types
+interface RetellResponseEngineBase {
+  type: string;
+}
+
+interface RetellResponseEngineRetellLLM extends RetellResponseEngineBase {
+  type: "retell-llm";
+  llm_id?: string;
+}
+
+interface RetellResponseEngineCustomLM extends RetellResponseEngineBase {
+  type: "custom-llm";
+  webhook_url?: string;
+}
+
+interface RetellResponseEngineConversationFlow extends RetellResponseEngineBase {
+  type: "conversation-flow";
+}
+
+// Union type for all response engine types
+type RetellResponseEngine = 
+  RetellResponseEngineRetellLLM | 
+  RetellResponseEngineCustomLM | 
+  RetellResponseEngineConversationFlow;
+
 // Expanded interfaces to better match the Retell SDK response structure
 export interface RetellAgent {
   id: string;
@@ -27,7 +52,7 @@ export interface RetellAgent {
   name: string;
   created_at: string;
   agent_name?: string;
-  response_engine?: ResponseEngine;
+  response_engine?: RetellResponseEngine;
   voice_model?: string;
   language?: string;
 }
@@ -85,7 +110,6 @@ export interface RetellCall {
 }
 
 export interface PhoneNumber {
-  phone_number_id?: string;  // Updated to match SDK
   phone_number: string;
   created_at?: string;
 }
@@ -216,7 +240,7 @@ class RetellAPI {
           type: agent.response_engine?.type || "retell-llm",
         };
         
-        // Only add llm_id if it exists
+        // Only add llm_id if it exists and the type is correct
         if (agent.response_engine?.type === "retell-llm" && agent.response_engine?.llm_id) {
           responseEngine.llm_id = agent.response_engine.llm_id;
         }
@@ -247,7 +271,7 @@ class RetellAPI {
         type: agent.response_engine?.type || "retell-llm",
       };
       
-      // Only add llm_id if it exists and the type is retell-llm
+      // Only add llm_id if it exists and the type is correct
       if (agent.response_engine?.type === "retell-llm" && agent.response_engine?.llm_id) {
         responseEngine.llm_id = agent.response_engine.llm_id;
       }
@@ -293,7 +317,7 @@ class RetellAPI {
         type: response.response_engine?.type || "retell-llm",
       };
       
-      // Only add llm_id if it exists
+      // Only add llm_id if it exists and the type is correct
       if (response.response_engine?.type === "retell-llm" && response.response_engine?.llm_id) {
         responseEngine.llm_id = response.response_engine.llm_id;
       }
@@ -440,9 +464,9 @@ class RetellAPI {
   async createPhoneCall(data: CreatePhoneCallRequest) {
     return this.callWithRetry(async () => {
       // Following API docs for phone call creation
-      const callParams: CallCreatePhoneCallParams = {
+      const callParams: any = {
         agent_id: data.agent_id,
-        to_number: data.to_number,  // Updated to match SDK expected parameter
+        to_number: data.to_number,  // Use to_number to match SDK parameter
         from_number: data.from_number,
         metadata: data.metadata || {}
       };
@@ -535,7 +559,6 @@ class RetellAPI {
       }
       
       const phoneNumbers: PhoneNumber[] = response.map((phone: any) => ({
-        phone_number_id: phone.phone_number_id || "",  // Updated field name
         phone_number: phone.phone_number || "",
         created_at: (phone as any).created_at || ""    // Safely access
       }));
@@ -550,7 +573,6 @@ class RetellAPI {
       
       // Convert to PhoneNumber format
       const result: PhoneNumber = {
-        phone_number_id: response.phone_number_id || "",  // Updated field name
         phone_number: response.phone_number || "",
         created_at: (response as any).created_at || ""    // Safely access
       };
