@@ -53,7 +53,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsLoading(true);
     try {
       const response = await retellApi.listAgents();
-      setAgents(response.data);
+      setAgents(response.data || []);
       setError(null);
     } catch (err: any) {
       handleApiError(err, "fetch agents");
@@ -68,7 +68,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsLoading(true);
     try {
       const response = await retellApi.listVoices();
-      setVoices(response.data);
+      setVoices(response.data || []);
       setError(null);
     } catch (err: any) {
       handleApiError(err, "fetch voices");
@@ -83,7 +83,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsLoading(true);
     try {
       const response = await retellApi.listLLMs();
-      setLLMs(response.data);
+      setLLMs(response.data || []);
       setError(null);
     } catch (err: any) {
       handleApiError(err, "fetch LLMs");
@@ -98,7 +98,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsLoading(true);
     try {
       const response = await retellApi.listCalls();
-      setCalls(response.data);
+      setCalls(response.data || []);
       setError(null);
     } catch (err: any) {
       handleApiError(err, "fetch calls");
@@ -162,32 +162,45 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Initial data fetching
     const fetchInitialData = async () => {
       setIsLoading(true);
+      
+      // Try to fetch each data type independently so that errors in one
+      // don't prevent the others from loading
+      const fetchPromises = [
+        (async () => {
+          try {
+            await refreshAgents();
+          } catch (err) {
+            console.error("Error fetching agents:", err);
+          }
+        })(),
+        
+        (async () => {
+          try {
+            await refreshVoices();
+          } catch (err) {
+            console.error("Error fetching voices:", err);
+          }
+        })(),
+        
+        (async () => {
+          try {
+            await refreshLLMs();
+          } catch (err) {
+            console.error("Error fetching LLMs:", err);
+          }
+        })(),
+        
+        (async () => {
+          try {
+            await refreshCalls();
+          } catch (err) {
+            console.error("Error fetching calls:", err);
+          }
+        })()
+      ];
+      
       try {
-        // Try to fetch each data type independently so that errors in one
-        // don't prevent the others from loading
-        try {
-          await refreshAgents();
-        } catch (err) {
-          console.error("Error fetching agents:", err);
-        }
-        
-        try {
-          await refreshVoices();
-        } catch (err) {
-          console.error("Error fetching voices:", err);
-        }
-        
-        try {
-          await refreshLLMs();
-        } catch (err) {
-          console.error("Error fetching LLMs:", err);
-        }
-        
-        try {
-          await refreshCalls();
-        } catch (err) {
-          console.error("Error fetching calls:", err);
-        }
+        await Promise.allSettled(fetchPromises);
       } catch (err) {
         console.error("Error during initial data fetch:", err);
       } finally {

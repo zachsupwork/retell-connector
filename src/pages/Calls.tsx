@@ -1,23 +1,26 @@
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { useRetell } from "@/context/RetellContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RefreshCcw, Plus, Phone } from "lucide-react";
+import { RefreshCcw, Plus, Phone, AlertCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/components/ui/use-toast";
 
 const Calls = () => {
-  const { calls, agents, isLoading, refreshCalls } = useRetell();
-  const [expandedCall, setExpandedCall] = useState<string | null>(null);
+  const { calls, agents, isLoading, refreshCalls, error } = useRetell();
+  const [refreshing, setRefreshing] = useState(false);
+  const { toast } = useToast();
 
   const getAgentName = (agentId: string) => {
     const agent = agents.find(a => a.id === agentId);
     return agent ? agent.name : "Unknown Agent";
   };
 
-  const formatDuration = (seconds: number) => {
+  const formatDuration = (seconds: number | null) => {
+    if (seconds === null) return "-";
     const minutes = Math.floor(seconds / 60);
     const remainingSeconds = Math.floor(seconds % 60);
     return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
@@ -36,14 +39,45 @@ const Calls = () => {
     }
   };
 
+  const handleRefresh = async () => {
+    if (refreshing) return;
+    
+    setRefreshing(true);
+    try {
+      await refreshCalls();
+      toast({
+        title: "Success",
+        description: "Call list refreshed successfully",
+      });
+    } catch (err) {
+      console.error("Error refreshing calls:", err);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  // Initial fetch
+  useEffect(() => {
+    if (calls.length === 0 && !isLoading && !error) {
+      refreshCalls().catch(err => {
+        console.error("Error in initial call fetch:", err);
+      });
+    }
+  }, [calls.length, isLoading, error, refreshCalls]);
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <h1 className="text-3xl font-bold text-gray-900">Call History</h1>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={refreshCalls} disabled={isLoading}>
-            <RefreshCcw className="h-4 w-4 mr-2" />
-            Refresh
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleRefresh} 
+            disabled={isLoading || refreshing}
+          >
+            <RefreshCcw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            {refreshing ? 'Refreshing...' : 'Refresh'}
           </Button>
           <Button asChild size="sm">
             <Link to="/calls/new">
@@ -62,7 +96,19 @@ const Calls = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {calls.length === 0 ? (
+          {error && (
+            <div className="mb-4 p-4 border border-red-200 bg-red-50 rounded-md flex items-center">
+              <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+          
+          {isLoading ? (
+            <div className="flex justify-center items-center py-12">
+              <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+              <span className="ml-3 text-muted-foreground">Loading calls...</span>
+            </div>
+          ) : calls.length === 0 ? (
             <div className="text-center py-8">
               <Phone className="h-8 w-8 mx-auto text-muted-foreground" />
               <h3 className="mt-4 text-lg font-medium">No calls found</h3>
@@ -100,7 +146,7 @@ const Calls = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        {call.duration !== null ? formatDuration(call.duration) : "-"}
+                        {formatDuration(call.duration)}
                       </TableCell>
                       <TableCell>
                         <Button
