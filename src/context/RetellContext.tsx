@@ -1,7 +1,6 @@
-
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { createRetellAPI, RetellAgent, RetellVoice, RetellLLM, RetellCall, CreateAgentRequest } from "../services/retellApi";
-import { RETELL_API_KEY } from "../config/retell";
+import { RETELL_API_KEY, RETELL_API_BASE_URL } from "../config/retell";
 import { useToast } from "@/components/ui/use-toast";
 import { toast as sonnerToast } from "sonner";
 
@@ -32,7 +31,10 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  const retellApi = createRetellAPI({ apiKey: RETELL_API_KEY });
+  const retellApi = createRetellAPI({ 
+    apiKey: RETELL_API_KEY,
+    baseUrl: RETELL_API_BASE_URL
+  });
 
   const handleApiError = (err: any, operation: string) => {
     console.error(`Error during ${operation}:`, err);
