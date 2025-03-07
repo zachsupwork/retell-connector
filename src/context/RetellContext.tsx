@@ -1,6 +1,7 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { createRetellAPI, RetellAgent, RetellVoice, RetellLLM, RetellCall, CreateAgentRequest } from "../services/retellApi";
-import { RETELL_API_KEY, RETELL_API_BASE_URL } from "../config/retell";
+import { RETELL_API_KEY, RETELL_API_BASE_URL, RETELL_API_TIMEOUT } from "../config/retell";
 import { useToast } from "@/components/ui/use-toast";
 import { toast as sonnerToast } from "sonner";
 
@@ -31,9 +32,11 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
+  // Create API client with explicit baseUrl and timeout
   const retellApi = createRetellAPI({ 
     apiKey: RETELL_API_KEY,
-    baseUrl: RETELL_API_BASE_URL
+    baseUrl: RETELL_API_BASE_URL,
+    timeout: RETELL_API_TIMEOUT
   });
 
   const handleApiError = (err: any, operation: string) => {
@@ -164,47 +167,50 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const fetchInitialData = async () => {
       setIsLoading(true);
       
-      const fetchPromises = [
-        (async () => {
-          try {
-            await refreshAgents();
-          } catch (err) {
-            console.error("Error fetching agents:", err);
-          }
-        })(),
+      // Add a slight delay to ensure everything is initialized properly
+      setTimeout(async () => {
+        const fetchPromises = [
+          (async () => {
+            try {
+              await refreshAgents();
+            } catch (err) {
+              console.error("Error fetching agents:", err);
+            }
+          })(),
+          
+          (async () => {
+            try {
+              await refreshVoices();
+            } catch (err) {
+              console.error("Error fetching voices:", err);
+            }
+          })(),
+          
+          (async () => {
+            try {
+              await refreshLLMs();
+            } catch (err) {
+              console.error("Error fetching LLMs:", err);
+            }
+          })(),
+          
+          (async () => {
+            try {
+              await refreshCalls();
+            } catch (err) {
+              console.error("Error fetching calls:", err);
+            }
+          })()
+        ];
         
-        (async () => {
-          try {
-            await refreshVoices();
-          } catch (err) {
-            console.error("Error fetching voices:", err);
-          }
-        })(),
-        
-        (async () => {
-          try {
-            await refreshLLMs();
-          } catch (err) {
-            console.error("Error fetching LLMs:", err);
-          }
-        })(),
-        
-        (async () => {
-          try {
-            await refreshCalls();
-          } catch (err) {
-            console.error("Error fetching calls:", err);
-          }
-        })()
-      ];
-      
-      try {
-        await Promise.allSettled(fetchPromises);
-      } catch (err) {
-        console.error("Error during initial data fetch:", err);
-      } finally {
-        setIsLoading(false);
-      }
+        try {
+          await Promise.allSettled(fetchPromises);
+        } catch (err) {
+          console.error("Error during initial data fetch:", err);
+        } finally {
+          setIsLoading(false);
+        }
+      }, 500); // Short delay before initial fetch
     };
 
     fetchInitialData();

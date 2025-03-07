@@ -1,9 +1,11 @@
+
 import { Retell } from 'retell-sdk';
-import { RETELL_API_KEY, RETELL_API_BASE_URL } from '../config/retell';
+import { RETELL_API_KEY, RETELL_API_BASE_URL, RETELL_API_TIMEOUT } from '../config/retell';
 
 interface RetellConfig {
   apiKey: string;
   baseUrl?: string;
+  timeout?: number;
 }
 
 export interface RetellAgent {
@@ -69,16 +71,19 @@ class RetellAPI {
 
   constructor(config: RetellConfig) {
     this.apiKey = config.apiKey;
-    // Initialize the Retell SDK client
+    
+    // Initialize the Retell SDK client with explicit baseURL and timeout
     this.client = new Retell({
       apiKey: this.apiKey,
-      baseURL: config.baseUrl || RETELL_API_BASE_URL, // Use the provided baseUrl or default
+      baseURL: config.baseUrl || RETELL_API_BASE_URL, // Explicitly set baseURL
+      timeout: config.timeout || RETELL_API_TIMEOUT, // Add timeout config
     });
   }
 
   // Agents
   async listAgents() {
     try {
+      console.log("Fetching agents from:", RETELL_API_BASE_URL);
       const response = await this.client.agent.list() as any;
       
       // Convert SDK response to expected format
@@ -153,6 +158,7 @@ class RetellAPI {
   // Voices
   async listVoices() {
     try {
+      console.log("Fetching voices from:", RETELL_API_BASE_URL);
       const response = await this.client.voice.list() as any;
       
       // Convert SDK response to expected format
@@ -182,6 +188,7 @@ class RetellAPI {
   // LLMs
   async listLLMs() {
     try {
+      console.log("Fetching LLMs from:", RETELL_API_BASE_URL);
       const response = await this.client.llm.list() as any;
       
       // Convert SDK response to expected format
@@ -248,6 +255,7 @@ class RetellAPI {
   // Calls
   async listCalls() {
     try {
+      console.log("Fetching calls from:", RETELL_API_BASE_URL);
       const response = await this.client.call.list({}) as any;
       
       // Convert SDK response to expected format
@@ -316,8 +324,10 @@ class RetellAPI {
     }
   }
 
-  // Helper method to format errors in a consistent way
+  // Helper method to format errors in a consistent way and provide more details for debugging
   private formatError(error: any): Error {
+    console.log("Full error details:", error);
+    
     if (error.response?.data) {
       return new Error(`Retell API Error: ${error.response.status} ${JSON.stringify(error.response.data)}`);
     } else if (error.message) {
@@ -329,5 +339,14 @@ class RetellAPI {
 }
 
 export const createRetellAPI = (config: RetellConfig) => {
-  return new RetellAPI(config);
+  console.log("Creating Retell API client with:", {
+    baseUrl: config.baseUrl || RETELL_API_BASE_URL,
+    timeout: config.timeout || RETELL_API_TIMEOUT
+  });
+  
+  return new RetellAPI({
+    apiKey: config.apiKey,
+    baseUrl: config.baseUrl || RETELL_API_BASE_URL,
+    timeout: config.timeout || RETELL_API_TIMEOUT
+  });
 };

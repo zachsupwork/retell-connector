@@ -5,7 +5,7 @@ import { useRetell } from "@/context/RetellContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { RefreshCcw, Plus, Phone, AlertCircle } from "lucide-react";
+import { RefreshCcw, Plus, Phone, AlertCircle, WifiOff } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/components/ui/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -17,6 +17,7 @@ const Calls = () => {
   const { toast } = useToast();
 
   const isRateLimitError = error?.includes("429") || error?.includes("Too many requests");
+  const isConnectionError = error?.includes("Connection error") || error?.includes("Failed to fetch");
 
   const getAgentName = (agentId: string) => {
     const agent = agents.find(a => a.id === agentId);
@@ -62,7 +63,7 @@ const Calls = () => {
     
     try {
       await refreshCalls();
-      if (!isRateLimitError) {
+      if (!isRateLimitError && !isConnectionError) {
         toast({
           title: "Success",
           description: "Call list refreshed successfully",
@@ -121,6 +122,16 @@ const Calls = () => {
         </Alert>
       )}
 
+      {isConnectionError && (
+        <Alert variant="destructive" className="mb-4">
+          <WifiOff className="h-4 w-4" />
+          <AlertTitle>Connection Error</AlertTitle>
+          <AlertDescription>
+            Unable to connect to the Retell API. Please check your network connection or try again later.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Recent Calls</CardTitle>
@@ -129,7 +140,7 @@ const Calls = () => {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {error && !isRateLimitError && (
+          {error && !isRateLimitError && !isConnectionError && (
             <div className="mb-4 p-4 border border-red-200 bg-red-50 rounded-md flex items-center">
               <AlertCircle className="h-5 w-5 text-red-500 mr-2" />
               <p className="text-sm text-red-700">{error}</p>
@@ -148,7 +159,9 @@ const Calls = () => {
               <p className="mt-2 text-sm text-muted-foreground">
                 {isRateLimitError 
                   ? "Unable to load calls due to rate limiting. Please try again later."
-                  : "Start your first call to see your call history here."}
+                  : isConnectionError
+                    ? "Unable to connect to the Retell API. Please check your connection."
+                    : "Start your first call to see your call history here."}
               </p>
               <Button asChild className="mt-4">
                 <Link to="/calls/new">Start a New Call</Link>
