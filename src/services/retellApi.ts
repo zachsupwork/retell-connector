@@ -1,11 +1,19 @@
 
 import { Retell } from 'retell-sdk';
-import { RETELL_API_KEY, RETELL_API_BASE_URL, RETELL_API_TIMEOUT } from '../config/retell';
+import { 
+  RETELL_API_KEY, 
+  RETELL_API_BASE_URL, 
+  RETELL_API_TIMEOUT,
+  RETELL_API_MAX_RETRIES,
+  RETELL_API_RETRY_DELAY
+} from '../config/retell';
 
 interface RetellConfig {
   apiKey: string;
   baseUrl?: string;
   timeout?: number;
+  maxRetries?: number;
+  retryDelay?: number;
 }
 
 export interface RetellAgent {
@@ -65,26 +73,80 @@ interface RetellResponseBase {
   created_at?: string;
 }
 
+// Sleep function for retry mechanism
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 class RetellAPI {
   private client: Retell;
   private apiKey: string;
+  private maxRetries: number;
+  private retryDelay: number;
 
   constructor(config: RetellConfig) {
     this.apiKey = config.apiKey;
+    this.maxRetries = config.maxRetries || RETELL_API_MAX_RETRIES;
+    this.retryDelay = config.retryDelay || RETELL_API_RETRY_DELAY;
+    
+    console.log("Initializing Retell SDK client with:", {
+      baseURL: config.baseUrl || RETELL_API_BASE_URL,
+      timeout: config.timeout || RETELL_API_TIMEOUT
+    });
     
     // Initialize the Retell SDK client with explicit baseURL and timeout
     this.client = new Retell({
       apiKey: this.apiKey,
-      baseURL: config.baseUrl || RETELL_API_BASE_URL, // Explicitly set baseURL
-      timeout: config.timeout || RETELL_API_TIMEOUT, // Add timeout config
+      baseURL: config.baseUrl || RETELL_API_BASE_URL, // Note: Retell SDK uses baseURL not baseUrl
+      timeout: config.timeout || RETELL_API_TIMEOUT,
     });
+  }
+
+  // Wrapper for API calls with retry logic
+  private async callWithRetry<T>(
+    apiCall: () => Promise<T>,
+    operation: string
+  ): Promise<T> {
+    let lastError: any;
+    
+    for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
+      try {
+        if (attempt > 0) {
+          console.log(`Retry attempt ${attempt} for ${operation}`);
+          await sleep(this.retryDelay * attempt); // Exponential backoff
+        }
+        
+        return await apiCall();
+      } catch (error) {
+        lastError = error;
+        console.error(`Error in ${operation} (attempt ${attempt + 1}/${this.maxRetries + 1}):`, error);
+        
+        // Check if error is related to rate limiting or temporary failure
+        const shouldRetry = this.isRetryableError(error);
+        if (!shouldRetry) {
+          console.log(`Non-retryable error for ${operation}, giving up.`);
+          break;
+        }
+      }
+    }
+    
+    throw this.formatError(lastError);
+  }
+  
+  // Determine if an error should trigger a retry
+  private isRetryableError(error: any): boolean {
+    // Network errors, timeouts, and rate limits (429) should be retried
+    if (!error.response) {
+      return true; // Network error, retry
+    }
+    
+    const status = error.response?.status;
+    return status === 429 || (status >= 500 && status < 600);
   }
 
   // Agents
   async listAgents() {
-    try {
+    return this.callWithRetry(async () => {
       console.log("Fetching agents from:", RETELL_API_BASE_URL);
-      const response = await this.client.agent.list() as any;
+      const response = await this.client.agent.list({}) as any;
       
       // Convert SDK response to expected format
       const agents: RetellAgent[] = (response.agents || []).map((agent: any) => ({
@@ -96,14 +158,11 @@ class RetellAPI {
       }));
       
       return { data: agents };
-    } catch (error) {
-      console.error("Error listing agents:", error);
-      throw this.formatError(error);
-    }
+    }, "listAgents");
   }
 
   async getAgent(agentId: string) {
-    try {
+    return this.callWithRetry(async () => {
       const agent = await this.client.agent.retrieve(agentId) as any;
       
       // Convert the SDK response to our expected format
@@ -116,27 +175,25 @@ class RetellAPI {
       };
       
       return result;
-    } catch (error) {
-      console.error(`Error retrieving agent ${agentId}:`, error);
-      throw this.formatError(error);
-    }
+    }, `getAgent(${agentId})`);
   }
 
   async createAgent(data: CreateAgentRequest) {
-    try {
-      // Prepare the request to match the SDK's expected format
+    return this.callWithRetry(async () => {
+      // Prepare the request to match the API's expected format according to docs
       const requestData: any = {
         name: data.name,
         voice_id: data.voice_id,
         llm_id: data.llm_id,
         initial_talk: data.initial_message,
-        metadata: data.metadata,
-        custom_data: data.custom_data,
+        metadata: data.metadata || {},
+        custom_data: data.custom_data || {},
         response_engine: {
-          type: "retell_llm"
+          type: "retell_llm" // As per API docs
         }
       };
       
+      console.log("Creating agent with data:", requestData);
       const response = await this.client.agent.create(requestData) as any;
       
       // Convert the SDK response to our expected format
@@ -149,15 +206,12 @@ class RetellAPI {
       };
       
       return agent;
-    } catch (error) {
-      console.error("Error creating agent:", error);
-      throw this.formatError(error);
-    }
+    }, "createAgent");
   }
 
   // Voices
   async listVoices() {
-    try {
+    return this.callWithRetry(async () => {
       console.log("Fetching voices from:", RETELL_API_BASE_URL);
       const response = await this.client.voice.list() as any;
       
@@ -169,25 +223,19 @@ class RetellAPI {
       }));
       
       return { data: voices };
-    } catch (error) {
-      console.error("Error listing voices:", error);
-      throw this.formatError(error);
-    }
+    }, "listVoices");
   }
 
   async getVoice(voiceId: string) {
-    try {
+    return this.callWithRetry(async () => {
       const response = await this.client.voice.retrieve(voiceId) as any;
       return response;
-    } catch (error) {
-      console.error(`Error retrieving voice ${voiceId}:`, error);
-      throw this.formatError(error);
-    }
+    }, `getVoice(${voiceId})`);
   }
 
   // LLMs
   async listLLMs() {
-    try {
+    return this.callWithRetry(async () => {
       console.log("Fetching LLMs from:", RETELL_API_BASE_URL);
       const response = await this.client.llm.list() as any;
       
@@ -200,30 +248,26 @@ class RetellAPI {
       }));
       
       return { data: llms };
-    } catch (error) {
-      console.error("Error listing LLMs:", error);
-      throw this.formatError(error);
-    }
+    }, "listLLMs");
   }
 
   async getLLM(llmId: string) {
-    try {
+    return this.callWithRetry(async () => {
       const response = await this.client.llm.retrieve(llmId) as any;
       return response;
-    } catch (error) {
-      console.error(`Error retrieving LLM ${llmId}:`, error);
-      throw this.formatError(error);
-    }
+    }, `getLLM(${llmId})`);
   }
 
-  // Web Calls
+  // Web Calls - Updated according to API docs
   async createWebCall(data: CreateCallRequest) {
-    try {
-      const callParams: any = {
+    return this.callWithRetry(async () => {
+      // Following API docs: https://docs.retellai.com/api-references/create-web-call
+      const callParams = {
         agent_id: data.agent_id,
-        metadata: data.metadata
+        metadata: data.metadata || {}
       };
       
+      console.log("Creating web call with params:", callParams);
       const response = await this.client.call.createWebCall(callParams) as any;
       
       // Format the response to match our expected interface
@@ -231,31 +275,30 @@ class RetellAPI {
         id: response.id || "",
         register_url: response.register_url || ""
       };
-    } catch (error) {
-      console.error("Error creating web call:", error);
-      throw this.formatError(error);
-    }
+    }, "createWebCall");
   }
 
-  // Phone Calls
+  // Phone Calls - Updated according to API docs
   async createPhoneCall(data: { agent_id: string; to_phone: string; metadata?: Record<string, string> }) {
-    try {
-      const response = await this.client.call.createPhoneCall({
+    return this.callWithRetry(async () => {
+      // Following API docs: https://docs.retellai.com/api-references/create-phone-call
+      const callParams = {
         agent_id: data.agent_id,
         to_phone: data.to_phone,
-        metadata: data.metadata
-      } as any);
+        metadata: data.metadata || {}
+      };
+      
+      console.log("Creating phone call with params:", callParams);
+      const response = await this.client.call.createPhoneCall(callParams as any);
       return response;
-    } catch (error) {
-      console.error("Error creating phone call:", error);
-      throw this.formatError(error);
-    }
+    }, "createPhoneCall");
   }
 
-  // Calls
+  // Calls - Updated according to API docs
   async listCalls() {
-    try {
+    return this.callWithRetry(async () => {
       console.log("Fetching calls from:", RETELL_API_BASE_URL);
+      // Empty object is needed per the API docs
       const response = await this.client.call.list({}) as any;
       
       // Convert SDK response to expected format
@@ -269,14 +312,12 @@ class RetellAPI {
       }));
       
       return { data: calls };
-    } catch (error) {
-      console.error("Error listing calls:", error);
-      throw this.formatError(error);
-    }
+    }, "listCalls");
   }
 
   async getCall(callId: string) {
-    try {
+    return this.callWithRetry(async () => {
+      // Following API docs: https://docs.retellai.com/api-references/get-call
       const call = await this.client.call.retrieve(callId) as any;
       
       // Convert to RetellCall format
@@ -289,15 +330,12 @@ class RetellAPI {
         duration: call.duration || null
       };
       return result;
-    } catch (error) {
-      console.error(`Error retrieving call ${callId}:`, error);
-      throw this.formatError(error);
-    }
+    }, `getCall(${callId})`);
   }
 
   // Phone Numbers
   async listPhoneNumbers() {
-    try {
+    return this.callWithRetry(async () => {
       const response = await this.client.phoneNumber.list() as any;
       
       // Convert SDK response to expected format
@@ -308,45 +346,53 @@ class RetellAPI {
       }));
       
       return { data: phoneNumbers };
-    } catch (error) {
-      console.error("Error listing phone numbers:", error);
-      throw this.formatError(error);
-    }
+    }, "listPhoneNumbers");
   }
 
   async getPhoneNumber(phoneNumberId: string) {
-    try {
+    return this.callWithRetry(async () => {
       const response = await this.client.phoneNumber.retrieve(phoneNumberId) as any;
       return response;
-    } catch (error) {
-      console.error(`Error retrieving phone number ${phoneNumberId}:`, error);
-      throw this.formatError(error);
-    }
+    }, `getPhoneNumber(${phoneNumberId})`);
   }
 
   // Helper method to format errors in a consistent way and provide more details for debugging
   private formatError(error: any): Error {
     console.log("Full error details:", error);
     
+    // Improved error formatting with more detailed information
+    let errorMessage = "Retell API Error: ";
+    
     if (error.response?.data) {
-      return new Error(`Retell API Error: ${error.response.status} ${JSON.stringify(error.response.data)}`);
+      errorMessage += `${error.response.status} ${JSON.stringify(error.response.data)}`;
     } else if (error.message) {
-      return new Error(`Retell API Error: ${error.message}`);
+      if (error.message.includes("Failed to fetch") || error.message.includes("NetworkError")) {
+        errorMessage += "Network connectivity issue. Please check your internet connection and try again.";
+      } else if (error.message.includes("timed out")) {
+        errorMessage += "Request timed out. The server took too long to respond.";
+      } else {
+        errorMessage += error.message;
+      }
     } else {
-      return new Error(`Retell API Error: Unknown error occurred`);
+      errorMessage += "Unknown error occurred";
     }
+    
+    return new Error(errorMessage);
   }
 }
 
 export const createRetellAPI = (config: RetellConfig) => {
   console.log("Creating Retell API client with:", {
     baseUrl: config.baseUrl || RETELL_API_BASE_URL,
-    timeout: config.timeout || RETELL_API_TIMEOUT
+    timeout: config.timeout || RETELL_API_TIMEOUT,
+    maxRetries: config.maxRetries || RETELL_API_MAX_RETRIES
   });
   
   return new RetellAPI({
     apiKey: config.apiKey,
     baseUrl: config.baseUrl || RETELL_API_BASE_URL,
-    timeout: config.timeout || RETELL_API_TIMEOUT
+    timeout: config.timeout || RETELL_API_TIMEOUT,
+    maxRetries: config.maxRetries || RETELL_API_MAX_RETRIES,
+    retryDelay: config.retryDelay || RETELL_API_RETRY_DELAY
   });
 };
