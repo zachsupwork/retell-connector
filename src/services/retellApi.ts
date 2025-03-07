@@ -1,4 +1,3 @@
-
 import { Retell } from 'retell-sdk';
 import { RETELL_API_KEY, RETELL_API_BASE_URL } from '../config/retell';
 
@@ -57,6 +56,11 @@ export interface CreateAgentRequest {
   metadata?: Record<string, string>;
   custom_data?: Record<string, any>;
   response_engine: { type: string };
+}
+
+interface RetellResponseBase {
+  id?: string;
+  created_at?: string;
 }
 
 class RetellAPI {
