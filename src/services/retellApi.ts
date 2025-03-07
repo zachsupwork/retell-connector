@@ -61,7 +61,8 @@ class RetellAPI {
 
   constructor(config: RetellConfig) {
     this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl || 'https://api.retellai.com/v2';
+    // Fixed API endpoint - removed the /v2 suffix as that seems to be causing the 404s
+    this.baseUrl = config.baseUrl || 'https://api.retellai.com';
   }
 
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
