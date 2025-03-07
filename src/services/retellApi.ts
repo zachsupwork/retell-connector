@@ -57,11 +57,11 @@ export interface RetellAgent {
   language?: string;
 }
 
-// Define response engine interface to handle different types
-export interface ResponseEngine {
-  type: string;
-  llm_id?: string;
-}
+// Define response engine interface to handle different types - removing this as we're using RetellResponseEngine instead
+// export interface ResponseEngine {
+//   type: string;
+//   llm_id?: string;
+// }
 
 export interface RetellVoice {
   id: string;
@@ -236,13 +236,22 @@ class RetellAPI {
       
       const agents: RetellAgent[] = response.map((agent: any) => {
         // Create a safe response_engine object that handles all possible types
-        const responseEngine: ResponseEngine = {
-          type: agent.response_engine?.type || "retell-llm",
-        };
+        let responseEngine: RetellResponseEngine;
         
-        // Only add llm_id if it exists and the type is correct
-        if (agent.response_engine?.type === "retell-llm" && agent.response_engine?.llm_id) {
-          responseEngine.llm_id = agent.response_engine.llm_id;
+        if (agent.response_engine?.type === "retell-llm") {
+          responseEngine = {
+            type: "retell-llm",
+            llm_id: agent.response_engine?.llm_id
+          } as RetellResponseEngineRetellLLM;
+        } else if (agent.response_engine?.type === "custom-llm") {
+          responseEngine = {
+            type: "custom-llm",
+            webhook_url: agent.response_engine?.webhook_url
+          } as RetellResponseEngineCustomLM;
+        } else {
+          responseEngine = {
+            type: "conversation-flow"
+          } as RetellResponseEngineConversationFlow;
         }
         
         return {
@@ -266,14 +275,23 @@ class RetellAPI {
     return this.callWithRetry(async () => {
       const agent = await this.client.agent.retrieve(agentId);
       
-      // Create a safe response_engine object that handles all possible types
-      const responseEngine: ResponseEngine = {
-        type: agent.response_engine?.type || "retell-llm",
-      };
+      // Create a safe response_engine object based on the type
+      let responseEngine: RetellResponseEngine;
       
-      // Only add llm_id if it exists and the type is correct
-      if (agent.response_engine?.type === "retell-llm" && agent.response_engine?.llm_id) {
-        responseEngine.llm_id = agent.response_engine.llm_id;
+      if (agent.response_engine?.type === "retell-llm") {
+        responseEngine = {
+          type: "retell-llm",
+          llm_id: agent.response_engine?.llm_id
+        } as RetellResponseEngineRetellLLM;
+      } else if (agent.response_engine?.type === "custom-llm") {
+        responseEngine = {
+          type: "custom-llm",
+          webhook_url: agent.response_engine?.webhook_url
+        } as RetellResponseEngineCustomLM;
+      } else {
+        responseEngine = {
+          type: "conversation-flow"
+        } as RetellResponseEngineConversationFlow;
       }
       
       // Convert the SDK response to our expected format
@@ -312,14 +330,23 @@ class RetellAPI {
       console.log("Creating agent with data:", requestData);
       const response = await this.client.agent.create(requestData);
       
-      // Create a safe response_engine object
-      const responseEngine: ResponseEngine = {
-        type: response.response_engine?.type || "retell-llm",
-      };
+      // Create a safe response_engine object based on the type
+      let responseEngine: RetellResponseEngine;
       
-      // Only add llm_id if it exists and the type is correct
-      if (response.response_engine?.type === "retell-llm" && response.response_engine?.llm_id) {
-        responseEngine.llm_id = response.response_engine.llm_id;
+      if (response.response_engine?.type === "retell-llm") {
+        responseEngine = {
+          type: "retell-llm",
+          llm_id: response.response_engine?.llm_id
+        } as RetellResponseEngineRetellLLM;
+      } else if (response.response_engine?.type === "custom-llm") {
+        responseEngine = {
+          type: "custom-llm",
+          webhook_url: response.response_engine?.webhook_url
+        } as RetellResponseEngineCustomLM;
+      } else {
+        responseEngine = {
+          type: "conversation-flow"
+        } as RetellResponseEngineConversationFlow;
       }
       
       // Convert the SDK response to our expected format
