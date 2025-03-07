@@ -61,7 +61,7 @@ class RetellAPI {
 
   constructor(config: RetellConfig) {
     this.apiKey = config.apiKey;
-    this.baseUrl = config.baseUrl || 'https://api.retellai.com/v1';
+    this.baseUrl = config.baseUrl || 'https://api.retell.io/v1';
   }
 
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
