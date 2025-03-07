@@ -1,11 +1,11 @@
-
 import { Retell } from 'retell-sdk';
 import { 
   RETELL_API_KEY, 
   RETELL_API_BASE_URL, 
   RETELL_API_TIMEOUT,
   RETELL_API_MAX_RETRIES,
-  RETELL_API_RETRY_DELAY
+  RETELL_API_RETRY_DELAY,
+  RETELL_API_PROXY_URL
 } from '../config/retell';
 
 interface RetellConfig {
@@ -14,6 +14,7 @@ interface RetellConfig {
   timeout?: number;
   maxRetries?: number;
   retryDelay?: number;
+  proxyUrl?: string;
 }
 
 export interface RetellAgent {
@@ -81,21 +82,27 @@ class RetellAPI {
   private apiKey: string;
   private maxRetries: number;
   private retryDelay: number;
+  private proxyUrl: string;
 
   constructor(config: RetellConfig) {
     this.apiKey = config.apiKey;
     this.maxRetries = config.maxRetries || RETELL_API_MAX_RETRIES;
     this.retryDelay = config.retryDelay || RETELL_API_RETRY_DELAY;
+    this.proxyUrl = config.proxyUrl || RETELL_API_PROXY_URL;
+    
+    const baseURL = this.proxyUrl 
+      ? `${this.proxyUrl}${encodeURIComponent(config.baseUrl || RETELL_API_BASE_URL)}`
+      : (config.baseUrl || RETELL_API_BASE_URL);
     
     console.log("Initializing Retell SDK client with:", {
-      baseURL: config.baseUrl || RETELL_API_BASE_URL,
+      baseURL: baseURL,
       timeout: config.timeout || RETELL_API_TIMEOUT
     });
     
     // Initialize the Retell SDK client with explicit baseURL and timeout
     this.client = new Retell({
       apiKey: this.apiKey,
-      baseURL: config.baseUrl || RETELL_API_BASE_URL, // Note: Retell SDK uses baseURL not baseUrl
+      baseURL: baseURL, // Note: Retell SDK uses baseURL not baseUrl
       timeout: config.timeout || RETELL_API_TIMEOUT,
     });
   }
@@ -145,7 +152,7 @@ class RetellAPI {
   // Agents
   async listAgents() {
     return this.callWithRetry(async () => {
-      console.log("Fetching agents from:", RETELL_API_BASE_URL);
+      console.log("Fetching agents from:", this.getProxiedUrl(RETELL_API_BASE_URL));
       const response = await this.client.agent.list({}) as any;
       
       // Convert SDK response to expected format
@@ -159,6 +166,11 @@ class RetellAPI {
       
       return { data: agents };
     }, "listAgents");
+  }
+
+  // Helper to get proxied URL if proxy is enabled
+  private getProxiedUrl(url: string): string {
+    return this.proxyUrl ? `${this.proxyUrl}${encodeURIComponent(url)}` : url;
   }
 
   async getAgent(agentId: string) {
@@ -382,17 +394,27 @@ class RetellAPI {
 }
 
 export const createRetellAPI = (config: RetellConfig) => {
+  const proxyUrl = config.proxyUrl || RETELL_API_PROXY_URL;
+  const baseUrl = config.baseUrl || RETELL_API_BASE_URL;
+  
+  // Optional: Log whether proxy is being used
+  if (proxyUrl) {
+    console.log(`Using CORS proxy: ${proxyUrl}`);
+  }
+  
   console.log("Creating Retell API client with:", {
-    baseUrl: config.baseUrl || RETELL_API_BASE_URL,
+    baseUrl: baseUrl,
     timeout: config.timeout || RETELL_API_TIMEOUT,
-    maxRetries: config.maxRetries || RETELL_API_MAX_RETRIES
+    maxRetries: config.maxRetries || RETELL_API_MAX_RETRIES,
+    proxyEnabled: !!proxyUrl
   });
   
   return new RetellAPI({
     apiKey: config.apiKey,
-    baseUrl: config.baseUrl || RETELL_API_BASE_URL,
+    baseUrl: baseUrl,
     timeout: config.timeout || RETELL_API_TIMEOUT,
     maxRetries: config.maxRetries || RETELL_API_MAX_RETRIES,
-    retryDelay: config.retryDelay || RETELL_API_RETRY_DELAY
+    retryDelay: config.retryDelay || RETELL_API_RETRY_DELAY,
+    proxyUrl: proxyUrl
   });
 };
