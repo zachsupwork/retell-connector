@@ -1,5 +1,5 @@
 
-import { Retell } from 'retell-sdk';
+import { Retell, CallResponse, WebCallResponse, PhoneCallResponse, ResponseEngineRetellLm, ResponseEngineCustomLm, ResponseEngineConversationFlow, CallCreatePhoneCallParams } from 'retell-sdk';
 import { 
   RETELL_API_KEY, 
   RETELL_API_BASE_URL, 
@@ -23,16 +23,19 @@ interface RetellConfig {
 export interface RetellAgent {
   id: string;
   voice_id: string;
-  llm_id: string;
+  llm_id?: string;
   name: string;
   created_at: string;
   agent_name?: string;
-  response_engine?: {
-    type: string;
-    llm_id: string;
-  };
+  response_engine?: ResponseEngine;
   voice_model?: string;
   language?: string;
+}
+
+// Define response engine interface to handle different types
+export interface ResponseEngine {
+  type: string;
+  llm_id?: string;
 }
 
 export interface RetellVoice {
@@ -82,9 +85,9 @@ export interface RetellCall {
 }
 
 export interface PhoneNumber {
-  id: string;
+  phone_number_id?: string;  // Updated to match SDK
   phone_number: string;
-  created_at: string;
+  created_at?: string;
 }
 
 export interface CreateWebCallRequest {
@@ -94,7 +97,7 @@ export interface CreateWebCallRequest {
 
 export interface CreatePhoneCallRequest {
   agent_id: string;
-  to_phone: string;
+  to_number: string;  // Changed from to_phone to to_number to match SDK
   from_number?: string;
   metadata?: Record<string, string>;
 }
@@ -111,7 +114,7 @@ export interface CreateAgentRequest {
   language?: string;
 }
 
-interface WebCallResponse {
+interface WebCallResponseCustom {
   id: string;
   register_url: string;
   call_id?: string;
@@ -207,17 +210,29 @@ class RetellAPI {
         return { data: [] };
       }
       
-      const agents: RetellAgent[] = response.map((agent: any) => ({
-        id: agent.agent_id || "",
-        voice_id: agent.voice_id || "",
-        llm_id: agent.llm_id || "",
-        name: agent.agent_name || "",
-        created_at: agent.last_modification_timestamp?.toString() || "",
-        agent_name: agent.agent_name || "",
-        response_engine: agent.response_engine || { type: "retell_llm", llm_id: "" },
-        voice_model: agent.voice_model || "",
-        language: agent.language || "en-US"
-      }));
+      const agents: RetellAgent[] = response.map((agent: any) => {
+        // Create a safe response_engine object that handles all possible types
+        const responseEngine: ResponseEngine = {
+          type: agent.response_engine?.type || "retell-llm",
+        };
+        
+        // Only add llm_id if it exists
+        if (agent.response_engine?.type === "retell-llm" && agent.response_engine?.llm_id) {
+          responseEngine.llm_id = agent.response_engine.llm_id;
+        }
+        
+        return {
+          id: agent.agent_id || "",
+          voice_id: agent.voice_id || "",
+          llm_id: agent.response_engine?.type === "retell-llm" ? agent.response_engine?.llm_id : undefined,
+          name: agent.agent_name || "",
+          created_at: agent.last_modification_timestamp?.toString() || "",
+          agent_name: agent.agent_name || "",
+          response_engine: responseEngine,
+          voice_model: agent.voice_model || "",
+          language: agent.language || "en-US"
+        };
+      });
       
       return { data: agents };
     }, "listAgents");
@@ -227,15 +242,25 @@ class RetellAPI {
     return this.callWithRetry(async () => {
       const agent = await this.client.agent.retrieve(agentId);
       
+      // Create a safe response_engine object that handles all possible types
+      const responseEngine: ResponseEngine = {
+        type: agent.response_engine?.type || "retell-llm",
+      };
+      
+      // Only add llm_id if it exists and the type is retell-llm
+      if (agent.response_engine?.type === "retell-llm" && agent.response_engine?.llm_id) {
+        responseEngine.llm_id = agent.response_engine.llm_id;
+      }
+      
       // Convert the SDK response to our expected format
       const result: RetellAgent = {
         id: agent.agent_id || "",
         voice_id: agent.voice_id || "",
-        llm_id: agent.response_engine?.llm_id || "",
+        llm_id: agent.response_engine?.type === "retell-llm" ? agent.response_engine?.llm_id : undefined,
         name: agent.agent_name || "",
         created_at: agent.last_modification_timestamp?.toString() || "",
         agent_name: agent.agent_name || "",
-        response_engine: agent.response_engine || { type: "retell_llm", llm_id: "" },
+        response_engine: responseEngine,
         voice_model: agent.voice_model || "",
         language: agent.language || "en-US"
       };
@@ -263,15 +288,25 @@ class RetellAPI {
       console.log("Creating agent with data:", requestData);
       const response = await this.client.agent.create(requestData);
       
+      // Create a safe response_engine object
+      const responseEngine: ResponseEngine = {
+        type: response.response_engine?.type || "retell-llm",
+      };
+      
+      // Only add llm_id if it exists
+      if (response.response_engine?.type === "retell-llm" && response.response_engine?.llm_id) {
+        responseEngine.llm_id = response.response_engine.llm_id;
+      }
+      
       // Convert the SDK response to our expected format
       const agent: RetellAgent = {
         id: response.agent_id || "",
         voice_id: response.voice_id || "",
-        llm_id: response.response_engine?.llm_id || "",
+        llm_id: response.response_engine?.type === "retell-llm" ? response.response_engine?.llm_id : undefined,
         name: response.agent_name || "",
         created_at: response.last_modification_timestamp?.toString() || "",
         agent_name: response.agent_name || "",
-        response_engine: response.response_engine || { type: "retell_llm", llm_id: "" },
+        response_engine: responseEngine,
         voice_model: response.voice_model || "",
         language: response.language || "en-US"
       };
@@ -389,11 +424,12 @@ class RetellAPI {
       const response = await this.client.call.createWebCall(callParams);
       
       // Format the response to match our expected interface
-      const webCallResponse: WebCallResponse = {
+      // Using any type to safely access properties that might not be in the SDK type
+      const webCallResponse: WebCallResponseCustom = {
         id: response.call_id || "",
-        register_url: response.register_url || "",
+        register_url: (response as any).register_url || "",  // Safely access potentially missing property
         call_id: response.call_id || "",
-        access_token: response.access_token || ""
+        access_token: (response as any).access_token || ""   // Safely access potentially missing property
       };
       
       return webCallResponse;
@@ -404,9 +440,9 @@ class RetellAPI {
   async createPhoneCall(data: CreatePhoneCallRequest) {
     return this.callWithRetry(async () => {
       // Following API docs for phone call creation
-      const callParams = {
+      const callParams: CallCreatePhoneCallParams = {
         agent_id: data.agent_id,
-        to_phone: data.to_phone,
+        to_number: data.to_number,  // Updated to match SDK expected parameter
         from_number: data.from_number,
         metadata: data.metadata || {}
       };
@@ -444,7 +480,7 @@ class RetellAPI {
         call_type: call.call_type || "",
         call_id: call.call_id || "",
         call_status: call.call_status || "",
-        access_token: call.access_token || "",
+        access_token: (call as any).access_token || "",  // Safely access
         start_timestamp: call.start_timestamp || null,
         end_timestamp: call.end_timestamp || null,
         transcript: call.transcript || "",
@@ -475,7 +511,7 @@ class RetellAPI {
         call_type: call.call_type || "",
         call_id: call.call_id || "",
         call_status: call.call_status || "",
-        access_token: call.access_token || "",
+        access_token: (call as any).access_token || "",  // Safely access
         start_timestamp: call.start_timestamp || null,
         end_timestamp: call.end_timestamp || null,
         transcript: call.transcript || "",
@@ -499,9 +535,9 @@ class RetellAPI {
       }
       
       const phoneNumbers: PhoneNumber[] = response.map((phone: any) => ({
-        id: phone.id || "",
+        phone_number_id: phone.phone_number_id || "",  // Updated field name
         phone_number: phone.phone_number || "",
-        created_at: phone.created_at || ""
+        created_at: (phone as any).created_at || ""    // Safely access
       }));
       
       return { data: phoneNumbers };
@@ -514,9 +550,9 @@ class RetellAPI {
       
       // Convert to PhoneNumber format
       const result: PhoneNumber = {
-        id: response.id || "",
+        phone_number_id: response.phone_number_id || "",  // Updated field name
         phone_number: response.phone_number || "",
-        created_at: response.created_at || ""
+        created_at: (response as any).created_at || ""    // Safely access
       };
       
       return result;
