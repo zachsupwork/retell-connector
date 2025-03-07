@@ -75,7 +75,7 @@ class RetellAPI {
   // Agents
   async listAgents() {
     try {
-      const response = await this.client.agent.list();
+      const response = await this.client.agent.list() as any;
       
       // Convert SDK response to expected format
       const agents: RetellAgent[] = (response.agents || []).map((agent: any) => ({
@@ -95,7 +95,7 @@ class RetellAPI {
 
   async getAgent(agentId: string) {
     try {
-      const agent = await this.client.agent.retrieve(agentId);
+      const agent = await this.client.agent.retrieve(agentId) as any;
       
       // Convert the SDK response to our expected format
       const result: RetellAgent = {
@@ -128,7 +128,7 @@ class RetellAPI {
         }
       };
       
-      const response = await this.client.agent.create(requestData);
+      const response = await this.client.agent.create(requestData) as any;
       
       // Convert the SDK response to our expected format
       const agent: RetellAgent = {
@@ -149,7 +149,7 @@ class RetellAPI {
   // Voices
   async listVoices() {
     try {
-      const response = await this.client.voice.list();
+      const response = await this.client.voice.list() as any;
       
       // Convert SDK response to expected format
       const voices: RetellVoice[] = (response.voices || []).map((voice: any) => ({
@@ -167,7 +167,7 @@ class RetellAPI {
 
   async getVoice(voiceId: string) {
     try {
-      const response = await this.client.voice.retrieve(voiceId);
+      const response = await this.client.voice.retrieve(voiceId) as any;
       return response;
     } catch (error) {
       console.error(`Error retrieving voice ${voiceId}:`, error);
@@ -178,7 +178,7 @@ class RetellAPI {
   // LLMs
   async listLLMs() {
     try {
-      const response = await this.client.llm.list();
+      const response = await this.client.llm.list() as any;
       
       // Convert SDK response to expected format
       const llms: RetellLLM[] = (response.llms || []).map((llm: any) => ({
@@ -197,7 +197,7 @@ class RetellAPI {
 
   async getLLM(llmId: string) {
     try {
-      const response = await this.client.llm.retrieve(llmId);
+      const response = await this.client.llm.retrieve(llmId) as any;
       return response;
     } catch (error) {
       console.error(`Error retrieving LLM ${llmId}:`, error);
@@ -213,7 +213,7 @@ class RetellAPI {
         metadata: data.metadata
       };
       
-      const response = await this.client.call.createWebCall(callParams);
+      const response = await this.client.call.createWebCall(callParams) as any;
       
       // Format the response to match our expected interface
       return {
@@ -244,7 +244,7 @@ class RetellAPI {
   // Calls
   async listCalls() {
     try {
-      const response = await this.client.call.list({});
+      const response = await this.client.call.list({}) as any;
       
       // Convert SDK response to expected format
       const calls: RetellCall[] = (response.calls || []).map((call: any) => ({
@@ -265,7 +265,7 @@ class RetellAPI {
 
   async getCall(callId: string) {
     try {
-      const call = await this.client.call.retrieve(callId);
+      const call = await this.client.call.retrieve(callId) as any;
       
       // Convert to RetellCall format
       const result: RetellCall = {
@@ -286,7 +286,7 @@ class RetellAPI {
   // Phone Numbers
   async listPhoneNumbers() {
     try {
-      const response = await this.client.phoneNumber.list();
+      const response = await this.client.phoneNumber.list() as any;
       
       // Convert SDK response to expected format
       const phoneNumbers: PhoneNumber[] = (response.phone_numbers || []).map((phone: any) => ({
@@ -304,7 +304,7 @@ class RetellAPI {
 
   async getPhoneNumber(phoneNumberId: string) {
     try {
-      const response = await this.client.phoneNumber.retrieve(phoneNumberId);
+      const response = await this.client.phoneNumber.retrieve(phoneNumberId) as any;
       return response;
     } catch (error) {
       console.error(`Error retrieving phone number ${phoneNumberId}:`, error);
