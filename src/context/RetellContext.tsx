@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
-import { createRetellAPI, RetellAgent, RetellVoice, RetellLLM, RetellCall, CreateAgentRequest } from "../services/retellApi";
+
+import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
+import { createRetellAPI, RetellAgent, RetellVoice, RetellLLM, RetellCall, CreateAgentRequest, CreateWebCallRequest } from "../services/retellApi";
 import { RETELL_API_KEY, RETELL_API_BASE_URL, RETELL_API_TIMEOUT, RETELL_API_MAX_RETRIES, RETELL_API_PROXY_URL } from "../config/retell";
 import { useToast } from "@/components/ui/use-toast";
 import { toast as sonnerToast } from "sonner";
@@ -39,7 +40,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     proxyUrl: RETELL_API_PROXY_URL
   });
 
-  const handleApiError = (err: any, operation: string) => {
+  const handleApiError = useCallback((err: any, operation: string) => {
     console.error(`Error during ${operation}:`, err);
     const message = err.message || `Failed to ${operation}`;
     setError(message);
@@ -51,9 +52,9 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
     
     sonnerToast.error("API Error", message);
-  };
+  }, [toast]);
 
-  const refreshAgents = async () => {
+  const refreshAgents = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await retellApi.listAgents();
@@ -65,9 +66,9 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [handleApiError]);
 
-  const refreshVoices = async () => {
+  const refreshVoices = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await retellApi.listVoices();
@@ -79,9 +80,9 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [handleApiError]);
 
-  const refreshLLMs = async () => {
+  const refreshLLMs = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await retellApi.listLLMs();
@@ -93,9 +94,9 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [handleApiError]);
 
-  const refreshCalls = async () => {
+  const refreshCalls = useCallback(async () => {
     setIsLoading(true);
     try {
       const response = await retellApi.listCalls();
@@ -107,9 +108,9 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [handleApiError]);
 
-  const createAgent = async (data: CreateAgentRequest) => {
+  const createAgent = useCallback(async (data: CreateAgentRequest) => {
     setIsLoading(true);
     try {
       const agentData: CreateAgentRequest = {
@@ -119,10 +120,12 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       const agent = await retellApi.createAgent(agentData);
       await refreshAgents();
+      
       toast({
         title: "Success",
         description: `Agent "${agent.name}" created successfully`,
       });
+      
       return agent;
     } catch (err: any) {
       handleApiError(err, "create agent");
@@ -130,27 +133,36 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [handleApiError, refreshAgents, toast]);
 
-  const createWebCall = async (agentId: string) => {
+  const createWebCall = useCallback(async (agentId: string) => {
     setIsLoading(true);
     try {
-      const result = await retellApi.createWebCall({ agent_id: agentId });
+      const callData: CreateWebCallRequest = { 
+        agent_id: agentId 
+      };
+      
+      const result = await retellApi.createWebCall(callData);
       await refreshCalls();
+      
       toast({
         title: "Success",
         description: "Web call created successfully",
       });
-      return result;
+      
+      return {
+        id: result.id,
+        register_url: result.register_url
+      };
     } catch (err: any) {
       handleApiError(err, "create web call");
       throw err;
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [handleApiError, refreshCalls, toast]);
 
-  const getCall = async (callId: string) => {
+  const getCall = useCallback(async (callId: string) => {
     setIsLoading(true);
     try {
       const call = await retellApi.getCall(callId);
@@ -161,49 +173,22 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [handleApiError]);
 
   useEffect(() => {
     const fetchInitialData = async () => {
       setIsLoading(true);
       
+      // Add small delay to ensure everything is initialized
       setTimeout(async () => {
-        const fetchPromises = [
-          (async () => {
-            try {
-              await refreshAgents();
-            } catch (err) {
-              console.error("Error fetching agents:", err);
-            }
-          })(),
-          
-          (async () => {
-            try {
-              await refreshVoices();
-            } catch (err) {
-              console.error("Error fetching voices:", err);
-            }
-          })(),
-          
-          (async () => {
-            try {
-              await refreshLLMs();
-            } catch (err) {
-              console.error("Error fetching LLMs:", err);
-            }
-          })(),
-          
-          (async () => {
-            try {
-              await refreshCalls();
-            } catch (err) {
-              console.error("Error fetching calls:", err);
-            }
-          })()
-        ];
-        
         try {
-          await Promise.allSettled(fetchPromises);
+          // Fetch data in parallel to speed things up
+          await Promise.allSettled([
+            refreshAgents(),
+            refreshVoices(),
+            refreshLLMs(),
+            refreshCalls()
+          ]);
         } catch (err) {
           console.error("Error during initial data fetch:", err);
         } finally {
@@ -213,7 +198,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     };
 
     fetchInitialData();
-  }, []);
+  }, [refreshAgents, refreshVoices, refreshLLMs, refreshCalls]);
 
   const value: RetellContextType = {
     agents,
