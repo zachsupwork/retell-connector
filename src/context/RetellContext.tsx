@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { createRetellAPI, RetellAgent, RetellVoice, RetellLLM, RetellCall, CreateAgentRequest } from "../services/retellApi";
 import { RETELL_API_KEY } from "../config/retell";
@@ -106,7 +107,13 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const createAgent = async (data: CreateAgentRequest) => {
     setIsLoading(true);
     try {
-      const agent = await retellApi.createAgent(data);
+      // Make sure response_engine is set
+      const agentData: CreateAgentRequest = {
+        ...data,
+        response_engine: { type: "retell_llm" }
+      };
+      
+      const agent = await retellApi.createAgent(agentData);
       await refreshAgents();
       toast({
         title: "Success",
@@ -143,7 +150,7 @@ export const RetellProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setIsLoading(true);
     try {
       const call = await retellApi.getCall(callId);
-      return call as RetellCall;
+      return call;
     } catch (err: any) {
       handleApiError(err, "get call");
       throw err;

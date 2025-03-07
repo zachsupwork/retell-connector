@@ -20,7 +20,8 @@ const NewAgent = () => {
     voice_id: "",
     llm_id: "",
     initial_message: "Hello, how can I help you today?",
-    metadata: {}
+    metadata: {},
+    response_engine: { type: "retell_llm" }
   });
 
   const [isSubmitting, setIsSubmitting] = useState(false);
