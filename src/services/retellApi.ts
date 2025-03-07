@@ -1,5 +1,5 @@
 
-import { Retell } from '@retell/sdk';
+import { Retell } from 'retell-sdk';
 
 interface RetellConfig {
   apiKey: string;
